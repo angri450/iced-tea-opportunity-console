@@ -28,7 +28,7 @@ const CENTER = RIM / 2
 
 // 贴纸：宽 96 mm、高 78 mm，贴在标签带正中，包住瓶身约 165 度
 const STICKER_W = 84
-const STICKER_H = 62
+const STICKER_H = 58
 const STICKER_MID = (profile.dims.labelZ0 + profile.dims.labelZ1) / 2 + 2
 const STICKER_R = BODY_R + 0.75
 
@@ -105,7 +105,7 @@ function makeStickerTexture(cfg: SceneConfig['sticker']) {
     ctx.fillStyle = '#1c1a17'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    const maxW = W * 0.78
+    const maxW = W * 0.64
     const fit = (text: string, start: number, weight: number) => {
       let size = start
       ctx.font = `${weight} ${size}px ${FONT_STACK}`
@@ -135,7 +135,7 @@ function makeStickerTexture(cfg: SceneConfig['sticker']) {
     ctx.fillStyle = '#16130f'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    const maxW = W * 0.72
+    const maxW = W * 0.58
     const fit = (text: string, start: number, stack: string) => {
       let size = start
       ctx.font = `${hand ? 600 : 700} ${size}px ${stack}`
@@ -248,15 +248,15 @@ function drawStage(ctx: CanvasRenderingContext2D, w: number, h: number, cfg: Sce
     }
   } else if (stage === 'desk') {
     // 课桌：右上角一扇窗，桌面留白
-    ctx.fillStyle = 'rgba(255,255,255,0.24)'
-    ctx.fillRect(w * 0.66, h * 0.1, w * 0.26, h * 0.24)
-    ctx.strokeStyle = 'rgba(255,255,255,0.62)'
+    ctx.fillStyle = 'rgba(255,255,255,0.14)'
+    ctx.fillRect(w * 0.68, h * 0.12, w * 0.24, h * 0.2)
+    ctx.strokeStyle = 'rgba(255,255,255,0.38)'
     ctx.lineWidth = Math.max(3, w * 0.004)
-    ctx.strokeRect(w * 0.66, h * 0.1, w * 0.26, h * 0.24)
+    ctx.strokeRect(w * 0.68, h * 0.12, w * 0.24, h * 0.2)
     ctx.beginPath()
-    ctx.moveTo(w * 0.79, h * 0.1)
-    ctx.lineTo(w * 0.79, h * 0.34)
-    ctx.moveTo(w * 0.66, h * 0.22)
+    ctx.moveTo(w * 0.8, h * 0.12)
+    ctx.lineTo(w * 0.8, h * 0.32)
+    ctx.moveTo(w * 0.68, h * 0.22)
     ctx.lineTo(w * 0.92, h * 0.22)
     ctx.stroke()
     // 左侧一摞书
@@ -630,7 +630,7 @@ export function createStage(container: HTMLElement, initial: SceneConfig): Stage
   )
   shadow.rotation.x = -Math.PI / 2
   shadow.position.y = -CENTER * MM - 0.2
-  shadow.scale.setScalar(170)
+  shadow.scale.setScalar(190)
   scene.add(shadow)
 
   // ---- 背景 ----
@@ -663,7 +663,7 @@ export function createStage(container: HTMLElement, initial: SceneConfig): Stage
     camera.aspect = width / height
     camera.updateProjectionMatrix()
     // 窄屏时把相机拉远，瓶子不被裁掉
-    const dist = 480 * (camera.aspect < 0.9 ? 1.3 : 1)
+    const dist = 430 * (camera.aspect < 0.9 ? 1.3 : 1)
     camera.position.z = dist
     camera.lookAt(0, 10, 0)
     shadow.scale.setScalar(dist / 3.1)
