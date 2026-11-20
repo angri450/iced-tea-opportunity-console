@@ -1,0 +1,30 @@
+# 依赖与构建产物
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Python
+__pycache__/
+*.pyc
+.venv-cad/
+
+# 内部文件，不进仓库
+AGENTS.md
+cad/
+*.docx
+
+# 编辑器与系统
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# 外部技能文档，非本项目内容
+antd-demo/docs/
+
+# 本地备份
+*.pre-guard
