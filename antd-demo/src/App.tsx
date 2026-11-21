@@ -31,6 +31,7 @@ import {
 import type { ColumnsType } from 'antd/es/table'
 import zhCN from 'antd/locale/zh_CN'
 import StickerBoard from './components/StickerBoard'
+import { STICKER_SIZE } from './scene/bottleStage'
 import profile from './data/bottle-profile.json'
 import { scenes } from './data/stickerScenes'
 import { buildTheme, type ThemeMode } from './theme'
@@ -889,10 +890,15 @@ function App() {
                 <div className="note-block" style={{ marginBottom: 14 }}>
                   <span className="note-label">这一块把贴纸整活做成能试的模型</span>
                   <div>
-                    梗卡只告诉你哪个梗能用，这里回答贴上瓶身长什么样。瓶身由 build123d 旋转成形，直径{' '}
-                    {profile.dims.bodyDiameter} mm、高 {profile.dims.totalHeight} mm，装 500 mL 时液面在{' '}
-                    {profile.fill.surfaceZ} mm。右侧 {scenes.length} 个场景里，{scenes.filter((s) => s.kind === '有出处').length}{' '}
-                    个挂在 2026-11-20 检索到的梗上并带原文链接，其余是设计稿。
+                    梗卡说哪个梗能用，这里看贴上瓶身长什么样。瓶身由 build123d 旋转成形，
+                    <span className="nowrap">直径 {profile.dims.bodyDiameter} mm</span>、
+                    <span className="nowrap">高 {profile.dims.totalHeight} mm</span>，
+                    <span className="nowrap">装 500 mL 时液面在 {profile.fill.surfaceZ} mm</span>。
+                    <span className="nowrap">
+                      {scenes.length} 个场景里{' '}
+                      {scenes.filter((s) => s.kind === '有出处').length} 个
+                    </span>
+                    挂在 <span className="nowrap">2026-11-20</span> 检索到的梗上并带原文链接，其余是设计稿。
                   </div>
                 </div>
 
@@ -903,8 +909,15 @@ function App() {
                     <div>先看能贴在哪</div>
                     <div />
                     <div>
-                      贴纸只改瓶身正面，不动标签、不动瓶型。{profile.dims.labelZ0} 到 {profile.dims.labelZ1}{' '}
-                      mm 的标签带刚好被盖住一半，拆开包装仍然认得出是哪个 SKU。
+                      贴纸只改瓶身正面，不动标签、不动瓶型。
+                      <span className="nowrap">
+                        {STICKER_SIZE.width} × {STICKER_SIZE.height} mm
+                      </span>
+                      的贴纸压在{' '}
+                      <span className="nowrap">
+                        {profile.dims.labelZ0} 到 {profile.dims.labelZ1} mm
+                      </span>
+                      的标签带中间，上下各留一圈红边，拆开包装仍然认得出是哪个 SKU。
                     </div>
                   </div>
                   <div className="vote-row">

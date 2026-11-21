@@ -29,17 +29,25 @@ export default function StickerBoard({ narrow }: { narrow: boolean }) {
   const handleRef = useRef<StageHandle | null>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const [announce, setAnnounce] = useState('')
+  const [failed, setFailed] = useState(false)
 
   const index = scenes.findIndex((s) => s.id === activeId)
   const current = scenes[index] ?? scenes[0]
+  const no = (i: number) => String(i + 1).padStart(2, '0')
 
   useEffect(() => {
     const el = stageRef.current
     if (!el) return
-    const handle = createStage(el, toConfig(current))
-    handleRef.current = handle
+    let handle: StageHandle | null = null
+    try {
+      handle = createStage(el, toConfig(current))
+      handleRef.current = handle
+    } catch {
+      // 拿不到 WebGL 上下文时不把整个页面拖垮，改成文字说明
+      setFailed(true)
+    }
     return () => {
-      handle.dispose()
+      handle?.dispose()
       handleRef.current = null
     }
     // 只在挂载时建一次，换场景走 setScene
@@ -52,8 +60,9 @@ export default function StickerBoard({ narrow }: { narrow: boolean }) {
 
   const pick = (next: StickerScene, focus = false) => {
     setActiveId(next.id)
-    setAnnounce(`已切到第 ${next.no} 个场景，${next.name}，贴纸写着${next.sticker.line1}`)
-    if (focus) {
+    const at = scenes.findIndex((s) => s.id === next.id) + 1
+    setAnnounce(`已切到第 ${at} 个场景，${next.name}，贴纸写着${next.sticker.line1 || '一张手绘表情'}`)
+    if (focus && !failed) {
       requestAnimationFrame(() => {
         listRef.current?.querySelector<HTMLElement>(`[data-id="${next.id}"]`)?.focus()
       })
@@ -89,10 +98,21 @@ export default function StickerBoard({ narrow }: { narrow: boolean }) {
   return (
     <div className={`board ${narrow ? 'board-narrow' : ''}`}>
       <div className="board-stage">
-        <div className="stage-canvas" ref={stageRef} role="img" aria-label={`${current.name}的瓶身贴纸效果，背景是${stageNames[current.stage]}`} />
+        <div
+          className="stage-canvas"
+          ref={stageRef}
+          role="img"
+          aria-label={`${current.name}的瓶身贴纸效果，背景是${stageNames[current.stage]}`}
+        />
+        {failed && (
+          <div className="stage-fallback">
+            <strong>这个浏览器没有可用的 WebGL</strong>
+            <span>瓶子转不起来，但右侧的贴纸文案、场景说明与出处链接仍可查看。</span>
+          </div>
+        )}
         <div className="stage-overlay">
           <div className="stage-tagline">
-            <span className="mono-num stage-no">{current.no}</span>
+            <span className="mono-num stage-no">{no(index)}</span>
             <span className="stage-name">{current.name}</span>
           </div>
           <div className="stage-sub">{current.moment}</div>
@@ -105,7 +125,7 @@ export default function StickerBoard({ narrow }: { narrow: boolean }) {
             onClick={() => step(-1)}
           />
           <span className="mono-num stage-count">
-            {String(index + 1).padStart(2, '0')} / {scenes.length}
+            {no(index)} / {scenes.length}
           </span>
           <Button
             size="small"
@@ -128,7 +148,7 @@ export default function StickerBoard({ narrow }: { narrow: boolean }) {
           <div className="board-detail-head">
             <div>
               <div className="board-kicker">
-                贴纸 {current.no} · {stageNames[current.stage]}
+                贴纸 {no(index)} · {stageNames[current.stage]}
               </div>
               <div className="board-sticker-line">
                 {current.sticker.line1}
@@ -190,7 +210,7 @@ export default function StickerBoard({ narrow }: { narrow: boolean }) {
           aria-activedescendant={`scene-${current.id}`}
           onKeyDown={onListKey}
         >
-          {scenes.map((s) => {
+          {scenes.map((s, i) => {
             const selected = s.id === current.id
             return (
               <button
@@ -211,7 +231,7 @@ export default function StickerBoard({ narrow }: { narrow: boolean }) {
                     background: `linear-gradient(160deg, ${s.palette.from}, ${s.palette.to})`,
                   }}
                 >
-                  <span className="scene-thumb-no mono-num">{s.no}</span>
+                  <span className="scene-thumb-no mono-num">{no(i)}</span>
                 </span>
                 <span className="scene-text">
                   <span className="scene-name">{s.name}</span>

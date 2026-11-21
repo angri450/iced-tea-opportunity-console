@@ -8,7 +8,6 @@ import type { Suggestion } from './memes'
 
 export type StickerScene = {
   id: string
-  no: string
   name: string
   moment: string
   kind: '有出处' | '设计稿'
@@ -39,7 +38,6 @@ const P = {
 export const scenes: StickerScene[] = [
   {
     id: 'exam',
-    no: '01',
     name: '考试周破防水',
     moment: '自习室桌面，两个人的复习资料中间空出一个瓶子的位置',
     kind: '有出处',
@@ -64,7 +62,6 @@ export const scenes: StickerScene[] = [
   },
   {
     id: 'price',
-    no: '02',
     name: '涨价老实人',
     moment: '便利店货架，价签旁边立着一瓶被贴了黑条的同款',
     kind: '有出处',
@@ -89,7 +86,6 @@ export const scenes: StickerScene[] = [
   },
   {
     id: 'guojiao',
-    no: '03',
     name: '冰镇如国窖',
     moment: '冷柜前，手正伸向最里排那瓶',
     kind: '有出处',
@@ -120,7 +116,6 @@ export const scenes: StickerScene[] = [
   },
   {
     id: 'dongbai',
-    no: '04',
     name: '东百往事',
     moment: '夜市摊塑料凳边，瓶身被烟头烫出一个小点',
     kind: '有出处',
@@ -144,7 +139,6 @@ export const scenes: StickerScene[] = [
   },
   {
     id: 'pain',
-    no: '05',
     name: '冰红茶痛宇宙',
     moment: '漫展摊位，瓶身挂满挂件和贴纸',
     kind: '有出处',
@@ -168,8 +162,23 @@ export const scenes: StickerScene[] = [
     ],
   },
   {
+    id: 'faceswap',
+    name: '瓶身换脸',
+    moment: '便利店冷柜前，店主拿贴纸把包装上的代言人头像盖住',
+    kind: '设计稿',
+    sticker: {
+      style: 'eyes',
+      line1: '',
+      tag: '人脸已下线 味道还在',
+    },
+    stage: 'fridge',
+    palette: P.cold,
+    suggestion: '人工复核',
+    why: '这是把 2026-11 补水啦换脸事件的玩法搬到冰红茶上。前提是包装上真有代言人肖像，没有肖像就没有这个场景。',
+    links: [],
+  },
+  {
     id: 'court',
-    no: '06',
     name: '球场边的战神',
     moment: '篮球场边线外的水泥台，瓶身挂着水珠',
     kind: '有出处',
@@ -194,7 +203,6 @@ export const scenes: StickerScene[] = [
   },
   {
     id: 'supper',
-    no: '07',
     name: '宵夜摊的固定搭档',
     moment: '夜宵摊折叠桌，油渍和签子把瓶身挡了一半',
     kind: '有出处',
@@ -219,7 +227,6 @@ export const scenes: StickerScene[] = [
   },
   {
     id: 'naked',
-    no: '08',
     name: '无标签瓶',
     moment: '仓库整箱堆头，箱子上写着「无标签版」',
     kind: '有出处',
@@ -243,7 +250,6 @@ export const scenes: StickerScene[] = [
   },
   {
     id: 'netbar',
-    no: '09',
     name: '网吧通宵',
     moment: '网吧机位，显示器边角露出一截瓶身',
     kind: '设计稿',
@@ -261,7 +267,6 @@ export const scenes: StickerScene[] = [
   },
   {
     id: 'camp',
-    no: '10',
     name: '露营',
     moment: '帐篷边的折叠桌上，瓶子和冰袋挨在一起',
     kind: '设计稿',
@@ -279,7 +284,6 @@ export const scenes: StickerScene[] = [
   },
   {
     id: 'dorm',
-    no: '11',
     name: '宿舍偷喝',
     moment: '宿舍上铺的桌板，瓶子被推到最里面',
     kind: '设计稿',
@@ -297,7 +301,6 @@ export const scenes: StickerScene[] = [
   },
   {
     id: 'army',
-    no: '12',
     name: '军训',
     moment: '操场边台阶，帽子下面压着一瓶',
     kind: '设计稿',
@@ -315,7 +318,6 @@ export const scenes: StickerScene[] = [
   },
   {
     id: 'overtime',
-    no: '13',
     name: '加班',
     moment: '工位隔断上，瓶身贴着便利贴',
     kind: '设计稿',

@@ -27,10 +27,20 @@ const RIM = profile.dims.totalHeight
 const CENTER = RIM / 2
 
 // 贴纸：宽 96 mm、高 78 mm，贴在标签带正中，包住瓶身约 165 度
-const STICKER_W = 84
-const STICKER_H = 58
+const STICKER_W = 60
+const STICKER_H = 52
 const STICKER_MID = (profile.dims.labelZ0 + profile.dims.labelZ1) / 2 + 2
 const STICKER_R = BODY_R + 0.75
+const NECK_R = profile.dims.neckDiameter / 2
+
+/** 贴纸成形尺寸，页面文案要用，不另填数字 */
+export const STICKER_SIZE = {
+  width: STICKER_W,
+  height: STICKER_H,
+  centerZ: STICKER_MID,
+  top: STICKER_MID + STICKER_H / 2,
+  bottom: STICKER_MID - STICKER_H / 2,
+}
 
 const FONT_STACK =
   '"PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif'
@@ -55,6 +65,74 @@ function paperGrain(ctx: CanvasRenderingContext2D, w: number, h: number) {
   ctx.restore()
 }
 
+/** 逐字绘制并加位置扰动，没有手写字体时也能看出是人写的 */
+function looseText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  cx: number,
+  cy: number,
+  size: number,
+  stack: string,
+  weight: number,
+  seed: number,
+) {
+  const chars = [...text]
+  ctx.font = `${weight} ${size}px ${stack}`
+  const widths = chars.map((c) => ctx.measureText(c).width)
+  const total = widths.reduce((a, b) => a + b, 0)
+  let x = cx - total / 2
+  let state = seed
+  const rnd = () => {
+    state = (state * 9301 + 49297) % 233280
+    return state / 233280
+  }
+  ctx.save()
+  ctx.textAlign = 'center'
+  chars.forEach((c, i) => {
+    if (c.trim()) {
+      ctx.save()
+      ctx.translate(
+        x + widths[i] / 2 + (rnd() - 0.5) * size * 0.05,
+        cy + (rnd() - 0.5) * size * 0.1,
+      )
+      ctx.rotate((rnd() - 0.5) * 0.08)
+      const sc = 0.95 + rnd() * 0.1
+      ctx.scale(sc, sc)
+      ctx.fillText(c, 0, 0)
+      ctx.restore()
+    }
+    x += widths[i]
+  })
+  ctx.restore()
+}
+
+/** 纸边：不是规矩的矩形，剪的时候会歪一点 */
+function roughPaperPath(W: number, H: number, seed: number) {
+  const path = new Path2D()
+  let state = seed
+  const rnd = () => {
+    state = (state * 9301 + 49297) % 233280
+    return state / 233280
+  }
+  const wob = W * 0.006
+  const steps = 7
+  path.moveTo(0, 0)
+  for (let i = 1; i <= steps; i += 1) {
+    path.lineTo((W / steps) * i, (rnd() - 0.5) * wob)
+  }
+  for (let i = 1; i <= steps; i += 1) {
+    path.lineTo(W + (rnd() - 0.5) * wob, (H / steps) * i)
+  }
+  for (let i = 1; i <= steps; i += 1) {
+    path.lineTo(W - (W / steps) * i, H + (rnd() - 0.5) * wob)
+  }
+  for (let i = 1; i <= steps; i += 1) {
+    path.lineTo((rnd() - 0.5) * wob, H - (H / steps) * i)
+  }
+  path.closePath()
+  return path
+}
+
 /** 手绘表情：两只 U 形眼加一张嘴，模仿参考图里贴纸遮脸的做法 */
 function drawFace(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number) {
   ctx.save()
@@ -65,7 +143,7 @@ function drawFace(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: numb
   // 左眼 U，右眼 U
   for (const dx of [-s * 0.42, s * 0.42]) {
     ctx.beginPath()
-    ctx.arc(cx + dx, cy - s * 0.16, s * 0.2, Math.PI * 0.12, Math.PI * 0.88, false)
+    ctx.arc(cx + dx, cy - s * 0.3, s * 0.2, Math.PI * 0.15, Math.PI * 0.85, false)
     ctx.stroke()
   }
   // 嘴
@@ -83,21 +161,25 @@ function makeStickerTexture(cfg: SceneConfig['sticker']) {
   canvas.width = W
   canvas.height = H
   const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = '#f7f3e8'
+  const seed = [...cfg.line1].reduce((acc, ch) => acc + ch.charCodeAt(0), 7)
+  const paper = roughPaperPath(W, H, seed)
+  ctx.save()
+  ctx.clip(paper)
+  ctx.fillStyle = '#fbf9f3'
   ctx.fillRect(0, 0, W, H)
   paperGrain(ctx, W, H)
-
-  // 纸边：一圈略深的印痕
-  ctx.strokeStyle = 'rgba(120, 104, 78, 0.28)'
-  ctx.lineWidth = 6
-  ctx.strokeRect(3, 3, W - 6, H - 6)
-
   const pad = W * 0.1
   const style = cfg.style
 
   if (style === 'eyes') {
-    // 只画表情，字留在角落
-    drawFace(ctx, W / 2, H * 0.44, H * 0.62)
+    // 只画表情，文案缩成一行小字放在下面
+    drawFace(ctx, W / 2, H * 0.46, H * 0.6)
+    if (cfg.tag) {
+      ctx.fillStyle = 'rgba(28, 26, 23, 0.62)'
+      ctx.font = `500 ${H * 0.105}px ${FONT_STACK}`
+      ctx.textAlign = 'center'
+      ctx.fillText(cfg.tag, W / 2, H * 0.86)
+    }
   } else if (style === 'print') {
     // 热敏标签机：窄条、等宽字、上下各一条虚线
     ctx.fillStyle = '#fbfaf6'
@@ -105,7 +187,7 @@ function makeStickerTexture(cfg: SceneConfig['sticker']) {
     ctx.fillStyle = '#1c1a17'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    const maxW = W * 0.64
+    const maxW = W * 0.724
     const fit = (text: string, start: number, weight: number) => {
       let size = start
       ctx.font = `${weight} ${size}px ${FONT_STACK}`
@@ -135,7 +217,7 @@ function makeStickerTexture(cfg: SceneConfig['sticker']) {
     ctx.fillStyle = '#16130f'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    const maxW = W * 0.58
+    const maxW = W * 0.72
     const fit = (text: string, start: number, stack: string) => {
       let size = start
       ctx.font = `${hand ? 600 : 700} ${size}px ${stack}`
@@ -149,25 +231,31 @@ function makeStickerTexture(cfg: SceneConfig['sticker']) {
 
     if (style === 'scribble') {
       // 先画一条黑条，字压在黑条上，像用记号笔盖住原包装
+      const barH = size * 1.6
       ctx.fillStyle = '#141210'
-      ctx.fillRect(pad * 0.4, H * 0.3, W - pad * 0.8, size * 1.35)
-      ctx.fillStyle = '#f7f3e8'
+      ctx.fillRect(pad * 0.25, H * 0.5 - barH / 2, W - pad * 0.5, barH)
+      ctx.fillStyle = '#fbf9f3'
     }
 
     const y1 = cfg.line2 ? H * 0.38 : H * 0.5
-    ctx.save()
-    if (hand) ctx.rotate(-0.012)
-    ctx.fillText(cfg.line1, W / 2, y1)
-    if (cfg.line2) {
-      const size2 = fit(cfg.line2, size * 0.96, hand ? HAND_STACK : FONT_STACK)
-      ctx.fillText(cfg.line2, W / 2, y1 + Math.max(size, size2) * 1.2)
+    if (hand) {
+      looseText(ctx, cfg.line1, W / 2, y1, size, HAND_STACK, 600, seed)
+      if (cfg.line2) {
+        const size2 = fit(cfg.line2, size * 0.96, HAND_STACK)
+        looseText(ctx, cfg.line2, W / 2, y1 + Math.max(size, size2) * 1.22, size2, HAND_STACK, 600, seed + 19)
+      }
+    } else {
+      ctx.fillText(cfg.line1, W / 2, y1)
+      if (cfg.line2) {
+        const size2 = fit(cfg.line2, size * 0.96, FONT_STACK)
+        ctx.fillText(cfg.line2, W / 2, y1 + Math.max(size, size2) * 1.22)
+      }
     }
-    ctx.restore()
 
     // 角落小字：店名、日期之类，模拟终端老板的落款
     if (cfg.tag) {
-      ctx.fillStyle = 'rgba(28, 26, 23, 0.6)'
-      ctx.font = `500 ${H * 0.07}px ${FONT_STACK}`
+      ctx.fillStyle = 'rgba(28, 26, 23, 0.62)'
+      ctx.font = `500 ${H * 0.075}px ${FONT_STACK}`
       ctx.textAlign = 'left'
       ctx.fillText(cfg.tag, pad * 0.5, H * 0.87)
     }
@@ -192,6 +280,17 @@ function makeStickerTexture(cfg: SceneConfig['sticker']) {
     ctx.fillStyle = g
     ctx.fillRect(0, 0, W, H)
   }
+
+  ctx.restore()
+  // 调试：把纸外区域填成纸白，分线 alpha 的影响
+  ctx.globalCompositeOperation = 'destination-over'
+  ctx.fillStyle = '#fbf9f3'
+  ctx.fillRect(0, 0, W, H)
+  ctx.globalCompositeOperation = 'source-over'
+  // 纸边一圈淡影，让白纸从红标签上分出来
+  ctx.strokeStyle = 'rgba(90, 74, 54, 0.42)'
+  ctx.lineWidth = 3
+  ctx.stroke(paper)
 
   const tex = new THREE.CanvasTexture(canvas)
   tex.colorSpace = THREE.SRGBColorSpace
@@ -218,7 +317,7 @@ function drawStage(ctx: CanvasRenderingContext2D, w: number, h: number, cfg: Sce
   // 构图约定：中间留给瓶子，道具集中在左右两侧
   if (stage === 'fridge') {
     // 冷柜：两侧竖格栅，顶部一条灯带
-    ctx.strokeStyle = 'rgba(255,255,255,0.42)'
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)'
     ctx.lineWidth = Math.max(2, w * 0.0025)
     for (const x of [0.04, 0.1, 0.16, 0.22, 0.78, 0.84, 0.9, 0.96]) {
       ctx.beginPath()
@@ -248,7 +347,7 @@ function drawStage(ctx: CanvasRenderingContext2D, w: number, h: number, cfg: Sce
     }
   } else if (stage === 'desk') {
     // 课桌：右上角一扇窗，桌面留白
-    ctx.fillStyle = 'rgba(255,255,255,0.14)'
+    ctx.fillStyle = 'rgba(255,255,255,0.1)'
     ctx.fillRect(w * 0.68, h * 0.12, w * 0.24, h * 0.2)
     ctx.strokeStyle = 'rgba(255,255,255,0.38)'
     ctx.lineWidth = Math.max(3, w * 0.004)
@@ -298,13 +397,13 @@ function drawStage(ctx: CanvasRenderingContext2D, w: number, h: number, cfg: Sce
     ctx.strokeStyle = 'rgba(255,255,255,0.2)'
     ctx.lineWidth = Math.max(2, w * 0.002)
     ctx.beginPath()
-    ctx.moveTo(0, h * 0.1)
-    ctx.quadraticCurveTo(w * 0.5, h * 0.24, w, h * 0.1)
+    ctx.moveTo(0, h * 0.05)
+    ctx.quadraticCurveTo(w * 0.5, h * 0.17, w, h * 0.05)
     ctx.stroke()
     for (let i = 0; i <= 10; i += 1) {
       const t = i / 10
       const x = w * t
-      const y = h * (0.1 + 0.14 * Math.sin(Math.PI * t))
+      const y = h * (0.05 + 0.12 * Math.sin(Math.PI * t))
       ctx.fillStyle = 'rgba(255, 226, 150, 0.85)'
       ctx.beginPath()
       ctx.arc(x, y, h * 0.011, 0, Math.PI * 2)
@@ -312,7 +411,7 @@ function drawStage(ctx: CanvasRenderingContext2D, w: number, h: number, cfg: Sce
     }
   } else if (stage === 'camp') {
     // 露营：远山、右侧帐篷
-    ctx.fillStyle = 'rgba(255,255,255,0.3)'
+    ctx.fillStyle = 'rgba(255,255,255,0.42)'
     ctx.beginPath()
     ctx.moveTo(0, horizon)
     ctx.lineTo(w * 0.18, h * 0.34)
@@ -326,7 +425,7 @@ function drawStage(ctx: CanvasRenderingContext2D, w: number, h: number, cfg: Sce
     ctx.fill()
     ctx.fillStyle = accent
     ctx.fillRect(0, horizon, w, h - horizon)
-    ctx.fillStyle = 'rgba(255,255,255,0.56)'
+    ctx.fillStyle = 'rgba(255,255,255,0.72)'
     ctx.beginPath()
     ctx.moveTo(w * 0.76, horizon)
     ctx.lineTo(w * 0.85, h * 0.4)
@@ -364,12 +463,34 @@ function drawStage(ctx: CanvasRenderingContext2D, w: number, h: number, cfg: Sce
     ctx.fillRect(0, horizon, w, h - horizon)
   }
 
+  // 四周压暗，视线收在中间
+  const vignette = ctx.createRadialGradient(w * 0.5, h * 0.52, w * 0.2, w * 0.5, h * 0.5, w * 0.78)
+  vignette.addColorStop(0, 'rgba(0,0,0,0)')
+  vignette.addColorStop(1, 'rgba(24,16,8,0.2)')
+  ctx.fillStyle = vignette
+  ctx.fillRect(0, 0, w, h)
+
   // 底部压暗，让瓶子有落点
   const shade = ctx.createLinearGradient(0, horizon, 0, h)
   shade.addColorStop(0, 'rgba(0,0,0,0)')
   shade.addColorStop(1, 'rgba(0,0,0,0.22)')
   ctx.fillStyle = shade
   ctx.fillRect(0, horizon, w, h - horizon)
+  ctx.restore()
+
+  // 接地阴影：瓶子站在画面中央偏下，阴影跟着瓶子走
+  const cx = w * 0.5
+  const cy = h * 0.875
+  const shadowGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, w * 0.12)
+  shadowGrad.addColorStop(0, 'rgba(30, 20, 10, 0.42)')
+  shadowGrad.addColorStop(0.5, 'rgba(30, 20, 10, 0.2)')
+  shadowGrad.addColorStop(1, 'rgba(30, 20, 10, 0)')
+  ctx.save()
+  ctx.translate(cx, cy)
+  ctx.scale(1, 0.26)
+  ctx.translate(-cx, -cy)
+  ctx.fillStyle = shadowGrad
+  ctx.fillRect(cx - w * 0.14, cy - w * 0.14, w * 0.28, w * 0.28)
   ctx.restore()
 }
 
@@ -442,21 +563,6 @@ function makeCapTexture() {
   return tex
 }
 
-function makeShadowTexture() {
-  const size = 256
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')!
-  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-  g.addColorStop(0, 'rgba(20, 14, 8, 0.55)')
-  g.addColorStop(0.45, 'rgba(20, 14, 8, 0.28)')
-  g.addColorStop(1, 'rgba(20, 14, 8, 0)')
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, size, size)
-  return new THREE.CanvasTexture(canvas)
-}
-
 export type StageHandle = {
   setScene: (cfg: SceneConfig) => void
   resize: () => void
@@ -484,54 +590,37 @@ export function createStage(container: HTMLElement, initial: SceneConfig): Stage
 
   // 环境反射：没有这张贴图，透明瓶身会像塑料片
   const pmrem = new THREE.PMREMGenerator(renderer)
-  const envRT = pmrem.fromScene(new RoomEnvironment(), 0.04)
+  const envRT = pmrem.fromScene(new RoomEnvironment(), 0.14)
   scene.environment = envRT.texture
   pmrem.dispose()
 
-  const key = new THREE.DirectionalLight('#fff4e2', 3.4)
+  const key = new THREE.DirectionalLight('#fff4e2', 2.6)
   key.position.set(-260, 420, 340)
   const fill = new THREE.DirectionalLight('#dce9ff', 0.7)
   fill.position.set(320, 160, 240)
   const rim = new THREE.DirectionalLight('#ffe7c4', 1.8)
   rim.position.set(120, 220, -360)
-  scene.add(key, fill, rim)
-  scene.add(new THREE.AmbientLight('#ffffff', 0.35))
+  const edge = new THREE.DirectionalLight('#e8f0ff', 2.2)
+  edge.position.set(340, 90, 60)
+  scene.add(key, fill, rim, edge)
+  scene.add(new THREE.AmbientLight('#ffffff', 0.55))
 
   const bottle = new THREE.Group()
   scene.add(bottle)
 
-  // ---- 外壳：只取侧面轮廓，两端不封口，顶底被瓶盖和台面挡住 ----
-  const shellPts = profile.outer
-    .filter(([, z]) => z > 0.01 && z <= RIM)
-    .map(([r, z]) => new THREE.Vector2(r * MM, (z - CENTER) * MM))
-  const shellGeo = new THREE.LatheGeometry(shellPts, 128)
-  const shellMat = new THREE.MeshPhysicalMaterial({
-    color: '#eef6ff',
-    metalness: 0,
-    roughness: 0.04,
-    transparent: true,
-    opacity: 0.22,
-    clearcoat: 1,
-    clearcoatRoughness: 0.02,
-    envMapIntensity: 2.6,
-    specularIntensity: 1,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-  })
-  const shell = new THREE.Mesh(shellGeo, shellMat)
-  shell.renderOrder = 3
-
   // ---- 液体 ----
   const liquidGeo = lathe(profile.liquid, 96)
   const liquidMat = new THREE.MeshPhysicalMaterial({
-    color: '#8a3208',
-    roughness: 0.08,
+    color: '#7d2b0b',
+    roughness: 0.07,
     metalness: 0,
-    transparent: true,
-    opacity: 0.9,
-    envMapIntensity: 1.9,
-    clearcoat: 1,
-    clearcoatRoughness: 0.04,
+    transparent: false,
+    opacity: 1,
+    envMapIntensity: 0.95,
+    clearcoat: 0.22,
+    clearcoatRoughness: 0.16,
+    emissive: '#40120a',
+    emissiveIntensity: 0.28,
   })
   const liquid = new THREE.Mesh(liquidGeo, liquidMat)
   liquid.renderOrder = 1
@@ -584,54 +673,62 @@ export function createStage(container: HTMLElement, initial: SceneConfig): Stage
   label.position.y = ((profile.dims.labelZ0 + profile.dims.labelZ1) / 2 - CENTER) * MM
   label.renderOrder = 2
 
-  // ---- 贴纸：一段弧面，正面朝相机 ----
-  const stickerTheta = STICKER_W / STICKER_R
-  const stickerGeo = new THREE.CylinderGeometry(
-    STICKER_R * MM,
-    STICKER_R * MM,
-    STICKER_H * MM,
-    48,
-    1,
-    true,
-    -stickerTheta / 2,
-    stickerTheta,
-  )
+  // ---- 贴纸：一张弯曲的纸，正面朝相机。UV 规整，边缘不会串色 ----
+  const stickerGeo = (() => {
+    const g = new THREE.PlaneGeometry(STICKER_W, STICKER_H, 48, 2)
+    const pos = g.attributes.position
+    for (let i = 0; i < pos.count; i += 1) {
+      const x = pos.getX(i)
+      const z = Math.sqrt(Math.max(STICKER_R * STICKER_R - x * x, 0))
+      pos.setZ(i, z - STICKER_R)
+    }
+    g.computeVertexNormals()
+    return g
+  })()
   const stickerMat = new THREE.MeshPhysicalMaterial({
-    roughness: 0.72,
+    roughness: 0.82,
     metalness: 0,
-    clearcoat: 0.08,
-    envMapIntensity: 0.5,
-    side: THREE.DoubleSide,
+    clearcoat: 0.04,
+    envMapIntensity: 0.35,
+    emissive: '#ffffff',
+    emissiveIntensity: 0.16,
+    side: THREE.FrontSide,
+    transparent: false,
+    alphaTest: 0.5,
     depthWrite: true,
   })
   const sticker = new THREE.Mesh(stickerGeo, stickerMat)
   sticker.position.y = (STICKER_MID - CENTER) * MM
+  sticker.position.z = STICKER_R * MM
   sticker.renderOrder = 4
   stickerMat.map = makeStickerTexture(initial.sticker)
 
-  bottle.add(liquid, label, sticker, shell, cap, capTop)
-
-  // ---- 台面与投影 ----
-  const groundMat = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0 })
-  const ground = new THREE.Mesh(new THREE.CircleGeometry(900, 64), groundMat)
-  ground.rotation.x = -Math.PI / 2
-  ground.position.y = -CENTER * MM - 0.4
-  scene.add(ground)
-
-  const shadowTex = makeShadowTexture()
-  const shadow = new THREE.Mesh(
-    new THREE.PlaneGeometry(1, 1),
-    new THREE.MeshBasicMaterial({
-      map: shadowTex,
-      transparent: true,
-      depthWrite: false,
-      opacity: 0.9,
-    }),
+  // ---- 瓶颈：PET 厚壁，看起来接近不透明，单独一段 ----
+  const neckPts = profile.outer
+    .filter(([, z]) => z >= 166 && z <= RIM)
+    .map(([r, z]) => new THREE.Vector2(r * MM, (z - CENTER) * MM))
+  const neckGeo = new THREE.LatheGeometry(neckPts, 96)
+  const neckMat = new THREE.MeshPhysicalMaterial({
+    color: '#e3f0f9',
+    roughness: 0.12,
+    metalness: 0,
+    clearcoat: 0.8,
+    clearcoatRoughness: 0.1,
+    envMapIntensity: 1.2,
+    side: THREE.DoubleSide,
+    transparent: true,
+    opacity: 0.42,
+  })
+  const neck = new THREE.Mesh(neckGeo, neckMat)
+  neck.renderOrder = 3
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry((NECK_R + 0.6) * MM, 0.9 * MM, 12, 48),
+    new THREE.MeshPhysicalMaterial({ color: '#d7e6f2', roughness: 0.25, clearcoat: 0.6 }),
   )
-  shadow.rotation.x = -Math.PI / 2
-  shadow.position.y = -CENTER * MM - 0.2
-  shadow.scale.setScalar(190)
-  scene.add(shadow)
+  ring.rotation.x = Math.PI / 2
+  ring.position.y = (184 - CENTER) * MM
+
+  bottle.add(liquid, label, sticker, neck, ring, cap, capTop)
 
   // ---- 背景 ----
   const bgCanvas = document.createElement('canvas')
@@ -639,6 +736,7 @@ export function createStage(container: HTMLElement, initial: SceneConfig): Stage
   bgTex.colorSpace = THREE.SRGBColorSpace
   scene.background = bgTex
 
+  let stickerPop = 1
   let current = initial
   let width = 0
   let height = 0
@@ -663,10 +761,9 @@ export function createStage(container: HTMLElement, initial: SceneConfig): Stage
     camera.aspect = width / height
     camera.updateProjectionMatrix()
     // 窄屏时把相机拉远，瓶子不被裁掉
-    const dist = 430 * (camera.aspect < 0.9 ? 1.3 : 1)
+    const dist = 400 * (camera.aspect < 0.9 ? 1.28 : 1)
     camera.position.z = dist
     camera.lookAt(0, 10, 0)
-    shadow.scale.setScalar(dist / 3.1)
     paintBackground()
   }
 
@@ -723,6 +820,11 @@ export function createStage(container: HTMLElement, initial: SceneConfig): Stage
         if (!reduceMotion) spin += dt * 0.09
       }
     }
+    if (stickerPop < 1) {
+      stickerPop = Math.min(1, stickerPop + dt * 3.2)
+      const k = 0.82 + 0.18 * stickerPop
+      sticker.scale.set(1, k, 1)
+    }
     bottle.rotation.y = spin
     // 贴着转时轻微摆动，像手上拿着
     bottle.rotation.z = reduceMotion ? 0 : Math.sin(clock.elapsedTime * 0.7) * 0.004
@@ -749,7 +851,8 @@ export function createStage(container: HTMLElement, initial: SceneConfig): Stage
       stickerMat.map = makeStickerTexture(cfg.sticker)
       stickerMat.needsUpdate = true
       old?.dispose()
-      groundMat.color.set(cfg.palette.ground)
+      // 换纸时纸面轻轻弹一下，提示这是刚贴上去的
+      stickerPop = reduceMotion ? 1 : 0.82
       paintBackground()
     },
     resize,
