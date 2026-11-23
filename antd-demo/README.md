@@ -8,10 +8,10 @@
 cd antd-demo
 npm run dev      # 开发服务器，改代码自动刷新
 npm run build    # 打包到 dist/
-node server.mjs  # 静态服务，默认端口 19052，读 dist/
+node server.mjs  # 静态服务，默认监听 127.0.0.1:19053，读 dist/
 ```
 
-2026-11-20 实测：`npm run build` 成功；`node server.mjs` 起在 19052，首页与全部 assets 返回 HTTP 200，gzip 生效；外网 `http://49.232.197.22:19052/` 返回 200。改完前端只要重新 `npm run build`，正在跑的 server.mjs 会直接读到新的 dist，不用重启。
+2026-11-23 实测：`npm run build` 成功；`node server.mjs` 起在 127.0.0.1:19053，由本机 Caddy 以 `https://49.232.197.22:19052/` 对外提供 TLS 与 gzip，首页与全部 assets 返回 HTTP 200。证书是 Let's Encrypt 的 6 天期 IP 证书，由 Caddy 自动续期。改完前端只要重新 `npm run build`，正在跑的 server.mjs 会直接读到新的 dist，不用重启。
 
 ## 二、四个视图
 
@@ -83,7 +83,7 @@ antd-demo/
 │   ├── data/bottle-profile.json  # build123d 算出的瓶身轮廓
 │   ├── index.css              # 设计变量与局部排版
 │   └── main.tsx               # antd 主题与语言
-├── server.mjs                 # 静态服务，19052
+├── server.mjs                 # 静态服务，127.0.0.1:19053
 └── dist/                      # 构建产物
 
 ../cad/

@@ -6,7 +6,8 @@ import { gzipSync } from 'node:zlib'
 import { join, extname, normalize } from 'node:path'
 
 const ROOT = new URL('./dist/', import.meta.url).pathname
-const PORT = Number(process.env.PORT || 19052)
+const PORT = Number(process.env.PORT || 19053)
+const HOST = process.env.HOST || '127.0.0.1'
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -69,6 +70,6 @@ createServer(async (req, res) => {
   } catch (e) {
     res.writeHead(500).end(String(e))
   }
-}).listen(PORT, '0.0.0.0', () => {
-  console.log(`静态服务已启动 http://0.0.0.0:${PORT}/  (根目录 ${ROOT})`)
+}).listen(PORT, HOST, () => {
+  console.log(`静态服务已启动 http://${HOST}:${PORT}/  (根目录 ${ROOT})`)
 })
