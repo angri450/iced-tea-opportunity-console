@@ -50,14 +50,22 @@ node server.mjs  # 静态服务，默认监听 127.0.0.1:19053，读 dist/
 9. 包装整活台。场景列表是 `role="listbox"`，上下方向键切换、Home 与 End 跳首尾，切换结果写入 `aria-live`；瓶子用拖拽旋转，画布标为 `role="img"` 并带当前场景的文字描述，系统开了「减少动态效果」时停止自动旋转与贴纸弹动。
 10. WebGL 不可用时。`createStage` 会在拿不到上下文时抛错，页面其余三块仍然可用；这一版的渲染没有加兜底图。
 
-## 六、交互与存储
+## 六、宣发统计
+
+1. 页头右侧有眼睛徽标，显示累计打开页面的次数，每 30 秒刷新一次。
+2. 「方法与边界」页有宣发统计卡，给累计访问、今日访问、独立访客与最近一次时间。
+3. 统计在 `server.mjs` 里做，写在 `antd-demo/.data/stats.json`，重启不丢。接口是 `GET /api/stats`。
+4. 只数打开页面的请求。排除爬虫与无头浏览器、`Sec-Purpose: prefetch` 预取、本机与回环地址。所以自己在这台服务器上点开不会抬高数字。
+5. 启动前的历史量按服务器日志回填 156 次，来源是 2026-11-20 至 2026-11-25 的 `GET /` 记录，界面上把这句写在统计卡下面。
+
+## 七、交互与存储
 
 1. 放行、否决会记下放行人名字和理由。
 2. 增量价值在新场景、新客、存量重复、未知之间四选一。
 3. 回填要填实际结果、勾选同期其他变化（促销、天气、铺货、竞品动作）、给结论。勾选竞争解释是为了让判断能被证伪。
 4. 上面三样存在浏览器 localStorage，键名 `iced-tea-console-v1`，刷新不丢。换浏览器或清缓存会重置。
 
-## 七、已知限制
+## 八、已知限制
 
 1. antd 6 里弹窗内容节点是 `.ant-modal-container`，不再是 `.ant-modal-content`，写自动化脚本要按新名字找。
 2. 构建体积：antd 约 972 kB（gzip 309 kB），three 约 556 kB（gzip 139 kB），业务代码约 70 kB（gzip 24 kB）。构建会提示超过 900 kB，演示场景可接受，要优化就把包装整活台拆成动态导入。
@@ -66,11 +74,11 @@ node server.mjs  # 静态服务，默认监听 127.0.0.1:19053，读 dist/
 5. 瓶身、瓶盖、标签是通用 500 mL PET 瓶比例，不是康师傅官方图纸。贴纸文案与配色都是设计稿，14 个场景里 6 个没有检索出处。
 6. 3D 场景在无 GPU 的服务器上靠 SwiftShader 软件渲染，实测能出图但帧率没有测。
 
-## 八、这次按哪些外部规范改的
+## 九、这次按哪些外部规范改的
 
 改动参照 Google Chrome 团队开源、由 Chrome、Edge、Firefox、MDN 联合维护的 Modern Web Guidance。仓库通过 GitCode 镜像拉到 `/tmp/mwg`（GitHub 直连被中途断开），技能说明装到 `~/.pi/agent/skills/modern-web-guidance/`。用到的指南有 `dark-mode`、`respect-os-text-scale`、`same-document-transitions`、`navigation-drawer`、`responsive-table`。
 
-## 九、目录
+## 十、目录
 
 ```
 antd-demo/

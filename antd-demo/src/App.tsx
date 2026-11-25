@@ -14,12 +14,14 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
 } from 'antd'
 import {
   ArrowLeftOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
   CloseOutlined,
+  EyeOutlined,
   FileSearchOutlined,
   LinkOutlined,
   MenuOutlined,
@@ -66,6 +68,16 @@ type Decision = {
 
 type Store = Record<string, Decision>
 
+type VisitStats = {
+  total: number
+  today: number
+  visitors: number
+  first: string | null
+  last: string | null
+  baseline: string | null
+  recent: [string, number][]
+}
+
 const STORAGE_KEY = 'iced-tea-console-v1'
 const THEME_KEY = 'iced-tea-theme'
 const CONFS = ['促销活动', '天气', '铺货与陈列', '竞品动作']
@@ -111,6 +123,7 @@ function App() {
   const [narrow, setNarrow] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [announce, setAnnounce] = useState('')
+  const [visitStats, setVisitStats] = useState<VisitStats | null>(null)
 
   const toggleRef = useRef<HTMLButtonElement>(null)
   const navRef = useRef<HTMLDivElement>(null)
@@ -157,6 +170,26 @@ function App() {
     // closeDrawer 是稳定的闭包，只依赖 drawerOpen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [drawerOpen])
+
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      try {
+        const res = await fetch('/api/stats', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = (await res.json()) as VisitStats
+        if (alive) setVisitStats(data)
+      } catch {
+        // 本地开发没有 /api/stats 时不显示，不影响其他功能
+      }
+    }
+    load()
+    const timer = window.setInterval(load, 30000)
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+    }
+  }, [])
 
   const closeDrawer = () => {
     setDrawerOpen(false)
@@ -508,6 +541,16 @@ function App() {
               {headerTitle}
             </span>
             <div style={{ flex: 1 }} />
+            {visitStats && (
+              <Tooltip
+                title={`今日 ${visitStats.today} 次 ｜ 独立访客 ${visitStats.visitors} 人 ｜ 每 30 秒刷新`}
+              >
+                <span className="visit-badge" aria-label={`累计访问 ${visitStats.total} 次`}>
+                  <EyeOutlined aria-hidden="true" />
+                  <span className="mono-num">{visitStats.total}</span>
+                </span>
+              </Tooltip>
+            )}
             <Button
               type="text"
               icon={mode === 'dark' ? <SunOutlined /> : <MoonOutlined />}
@@ -946,6 +989,50 @@ function App() {
                     四个梗的四项判定与全部链接来自 2026-11-20 的实际检索，链接可逐条点开。示例不代表康师傅真实决策，也不含投放数据。
                   </div>
                 </div>
+
+                <Card title="宣发统计" styles={{ body: { paddingTop: 12 } }} style={{ marginBottom: 16 }}>
+                  <div className="action-band">
+                    <div className="action-cell">
+                      <div className="action-label">累计访问</div>
+                      <div className="kpi-value">
+                        {visitStats ? visitStats.total : '—'}
+                        <span style={{ fontSize: '0.75rem', fontWeight: 400, marginLeft: 4 }} className="muted">
+                          次
+                        </span>
+                      </div>
+                    </div>
+                    <div className="action-cell">
+                      <div className="action-label">今日访问</div>
+                      <div className="kpi-value">
+                        {visitStats ? visitStats.today : '—'}
+                        <span style={{ fontSize: '0.75rem', fontWeight: 400, marginLeft: 4 }} className="muted">
+                          次
+                        </span>
+                      </div>
+                    </div>
+                    <div className="action-cell">
+                      <div className="action-label">独立访客</div>
+                      <div className="kpi-value">
+                        {visitStats ? visitStats.visitors : '—'}
+                        <span style={{ fontSize: '0.75rem', fontWeight: 400, marginLeft: 4 }} className="muted">
+                          人
+                        </span>
+                      </div>
+                    </div>
+                    <div className="action-cell">
+                      <div className="action-label">最近一次</div>
+                      <div className="action-value" style={{ fontSize: '0.875rem' }}>
+                        {visitStats?.last
+                          ? new Date(visitStats.last).toLocaleString('zh-CN', { hour12: false })
+                          : '尚无记录'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="method-note" style={{ marginTop: 12 }}>
+                    统计只数打开页面的请求，排除搜索爬虫、浏览器预取、本机与回环地址，避免把自测算进宣发量。数字每 30 秒刷新一次。
+                    {visitStats?.baseline ? ` ${visitStats.baseline}。` : ''}
+                  </div>
+                </Card>
 
                 <Card title="能力边界" styles={{ body: { paddingTop: 8 } }} style={{ marginBottom: 16 }}>
                   {boundaries.map((b, i) => (

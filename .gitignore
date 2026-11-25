@@ -28,3 +28,6 @@ antd-demo/docs/
 
 # 本地备份
 *.pre-guard
+
+# 运行时统计，不进仓库
+antd-demo/.data/

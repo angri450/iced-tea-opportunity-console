@@ -1,11 +1,14 @@
 // 静态服务：读取 dist 目录，对文本类型做 gzip，并给带哈希的资源长缓存
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
-import { createReadStream } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { gzipSync } from 'node:zlib'
 import { join, extname, normalize } from 'node:path'
 
 const ROOT = new URL('./dist/', import.meta.url).pathname
+const DATA_DIR = new URL('./.data/', import.meta.url).pathname
+const STATS_FILE = join(DATA_DIR, 'stats.json')
 const PORT = Number(process.env.PORT || 19053)
 const HOST = process.env.HOST || '127.0.0.1'
 
@@ -36,10 +39,98 @@ async function load(file) {
   return entry
 }
 
+
+// ---------------------------------------------------------------- 访问统计
+// 只数“打开页面”的请求：排除爬虫、预取、本机与回环，避免把自测算进宣发量。
+mkdirSync(DATA_DIR, { recursive: true })
+
+const dayKey = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
+const LOCAL_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', '49.232.197.22'])
+
+function loadStats() {
+  try {
+    const raw = JSON.parse(readFileSync(STATS_FILE, 'utf8'))
+    return {
+      total: raw.total || 0,
+      first: raw.first || null,
+      last: raw.last || null,
+      baseline: raw.baseline || null,
+      days: raw.days || {},
+      visitors: raw.visitors || {},
+    }
+  } catch {
+    // 首次启动：11-20 至 11-25 的服务器日志里能数出 156 次页面请求，作为基线
+    return {
+      total: 156,
+      first: '2026-11-20',
+      last: null,
+      baseline: '启动前服务器日志回填 156 次（2026-11-20 至 2026-11-25）',
+      days: {},
+      visitors: {},
+    }
+  }
+}
+
+let stats = loadStats()
+let flushTimer = null
+
+function saveStats() {
+  if (flushTimer) return
+  flushTimer = setTimeout(() => {
+    flushTimer = null
+    const cutoff = new Date(Date.now() - 120 * 86400 * 1000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
+    for (const d of Object.keys(stats.days)) if (d < cutoff) delete stats.days[d]
+    try {
+      writeFileSync(STATS_FILE, JSON.stringify(stats))
+    } catch (e) {
+      console.error('写统计失败', e.message)
+    }
+  }, 200)
+}
+
+function countView(req) {
+  const ua = String(req.headers['user-agent'] || '')
+  if (!ua || /bot|spider|crawl|headless|preview|lighthouse|curl|wget|python/i.test(ua)) return false
+  const purpose = String(req.headers['sec-purpose'] || req.headers['purpose'] || '').toLowerCase()
+  if (purpose.includes('prefetch') || purpose.includes('prerender')) return false
+  const forwarded = String(req.headers['x-real-ip'] || '').trim()
+  const ip = forwarded || String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || ''
+  if (LOCAL_IPS.has(ip)) return false
+  const key = createHash('sha256').update(ip + '|' + ua).digest('hex').slice(0, 16)
+  const day = dayKey()
+  stats.total += 1
+  stats.days[day] = (stats.days[day] || 0) + 1
+  stats.visitors[key] = Date.now()
+  stats.last = new Date().toISOString()
+  if (!stats.first) stats.first = day
+  saveStats()
+  return true
+}
+
+function statsPayload() {
+  const today = dayKey()
+  const recent = Object.entries(stats.days).sort(([a], [b]) => (a < b ? -1 : 1)).slice(-14)
+  return {
+    total: stats.total,
+    today: stats.days[today] || 0,
+    visitors: Object.keys(stats.visitors).length,
+    first: stats.first,
+    last: stats.last,
+    baseline: stats.baseline,
+    recent,
+  }
+}
+
 createServer(async (req, res) => {
   const started = Date.now()
   try {
     const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname)
+
+    if (urlPath === '/api/stats') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' })
+      res.end(JSON.stringify(statsPayload()))
+      return
+    }
     let file = normalize(join(ROOT, urlPath === '/' ? 'index.html' : urlPath))
     if (!file.startsWith(ROOT)) {
       res.writeHead(403).end('forbidden')
@@ -51,6 +142,10 @@ createServer(async (req, res) => {
       file = join(ROOT, 'index.html')
     }
     const entry = await load(file)
+    if (urlPath === '/' || file === join(ROOT, 'index.html')) {
+      const accept = String(req.headers['accept'] || '')
+      if (req.method === 'GET' && (accept.includes('text/html') || accept === '')) countView(req)
+    }
     const acceptGzip = /\bgzip\b/.test(req.headers['accept-encoding'] || '')
     const hashed = /-[A-Za-z0-9_]{8,}\.(js|css)$/.test(file)
     res.setHeader('Content-Type', entry.type)

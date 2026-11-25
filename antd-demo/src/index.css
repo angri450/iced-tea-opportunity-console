@@ -744,3 +744,18 @@ body {
   color: var(--ink-500);
   background: var(--surface-sunken);
 }
+
+/* 页头的访问量徽标 */
+.visit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--ink-100);
+  background: var(--ink-50);
+  color: var(--ink-700);
+  font-size: 0.8125rem;
+  line-height: 1;
+  white-space: nowrap;
+}
