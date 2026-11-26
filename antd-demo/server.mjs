@@ -109,7 +109,19 @@ function countView(req) {
 
 function statsPayload() {
   const today = dayKey()
-  const recent = Object.entries(stats.days).sort(([a], [b]) => (a < b ? -1 : 1)).slice(-14)
+  const tracked = Object.keys(stats.days).sort()
+  const since = tracked[0] || null
+  // 从开始统计那天到今天，逐日补零，画图时不漏空档
+  const days = []
+  if (since) {
+    const cursor = new Date(since + 'T00:00:00+08:00')
+    const end = new Date(today + 'T00:00:00+08:00')
+    while (cursor <= end && days.length < 60) {
+      const key = cursor.toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
+      days.push({ date: key, count: stats.days[key] || 0 })
+      cursor.setDate(cursor.getDate() + 1)
+    }
+  }
   return {
     total: stats.total,
     today: stats.days[today] || 0,
@@ -117,7 +129,8 @@ function statsPayload() {
     first: stats.first,
     last: stats.last,
     baseline: stats.baseline,
-    recent,
+    since,
+    days,
   }
 }
 
