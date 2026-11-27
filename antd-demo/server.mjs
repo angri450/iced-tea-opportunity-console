@@ -106,10 +106,10 @@ if (stats.manual) {
   for (const [d, c] of Object.entries(manual.days)) {
     if (!(d in stats.days)) stats.days[d] = Number(c) || 0
   }
-  const sum = Object.values(manual.days).reduce((a, b) => a + (Number(b) || 0), 0)
-  if (sum !== stats.seed) console.warn(`手工按日合计 ${sum} 次，与回填 ${stats.seed} 次不一致，请核对`)
   stats.seed = 0
   stats.seedUntil = null
+  // 以手工按日表为准时，总数按逐日之和重算，保证柱线终点与页头数字一致
+  stats.total = Object.values(stats.days).reduce((a, b) => a + b, 0)
 }
 let flushTimer = null
 
