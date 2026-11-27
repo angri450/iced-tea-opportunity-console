@@ -78,6 +78,8 @@ type VisitStats = {
   baseline: string | null
   since: string | null
   days: { date: string; count: number }[]
+  cumulative: { date: string; value: number; daily: number | null }[]
+  manual: boolean
 }
 
 const STORAGE_KEY = 'iced-tea-console-v1'
@@ -1031,8 +1033,8 @@ function App() {
                     </div>
                   </div>
                   <div style={{ marginTop: 18 }}>
-                    <div style={{ fontWeight: 500, marginBottom: 8 }}>访问量随时间变化</div>
-                    <VisitChart days={visitStats?.days ?? []} />
+                    <div style={{ fontWeight: 500, marginBottom: 8 }}>每天次数与累计</div>
+                    <VisitChart points={visitStats?.cumulative ?? []} manual={visitStats?.manual} />
                   </div>
                   <div className="method-note" style={{ marginTop: 12 }}>
                     统计只数打开页面的请求，排除搜索爬虫、浏览器预取、本机与回环地址，避免把自测算进宣发量。数字每 30 秒刷新一次。

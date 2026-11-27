@@ -9,6 +9,7 @@ import { join, extname, normalize } from 'node:path'
 const ROOT = new URL('./dist/', import.meta.url).pathname
 const DATA_DIR = new URL('./.data/', import.meta.url).pathname
 const STATS_FILE = join(DATA_DIR, 'stats.json')
+const MANUAL_FILE = join(DATA_DIR, 'manual.json')
 const PORT = Number(process.env.PORT || 19053)
 const HOST = process.env.HOST || '127.0.0.1'
 
@@ -47,11 +48,25 @@ mkdirSync(DATA_DIR, { recursive: true })
 const dayKey = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
 const LOCAL_IPS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1', '49.232.197.22'])
 
+function dayBefore(date) {
+  const d = new Date(date + 'T00:00:00+08:00')
+  d.setDate(d.getDate() - 1)
+  return d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' })
+}
+
 function loadStats() {
   try {
     const raw = JSON.parse(readFileSync(STATS_FILE, 'utf8'))
+    const days = raw.days || {}
+    const tracked = Object.keys(days).sort()
+    const daysSum = Object.values(days).reduce((a, b) => a + b, 0)
+    // 老文件没有 seed 时：历史量 = 总数 - 按日之和，起点落在最早统计日的前一天
+    const seed = raw.seed !== undefined ? raw.seed : Math.max(0, (raw.total || 0) - daysSum)
+    const seedUntil = raw.seedUntil || (tracked.length ? dayBefore(tracked[0]) : null)
     return {
       total: raw.total || 0,
+      seed,
+      seedUntil,
       first: raw.first || null,
       last: raw.last || null,
       baseline: raw.baseline || null,
@@ -65,13 +80,37 @@ function loadStats() {
       first: '2026-11-20',
       last: null,
       baseline: '启动前服务器日志回填 156 次（2026-11-20 至 2026-11-25）',
+      seed: 156,
+      seedUntil: '2026-11-25',
       days: {},
       visitors: {},
     }
   }
 }
 
+// 手工按日登记：给统计开始前那几天的每日展示次数。
+// 有这份文件就用它替代整段回填，曲线才是真实回顾而不是一条平线。
+function loadManual() {
+  try {
+    const raw = JSON.parse(readFileSync(MANUAL_FILE, 'utf8'))
+    return { days: raw.days || {}, note: raw.note || null }
+  } catch {
+    return { days: {}, note: null }
+  }
+}
+
+let manual = loadManual()
 let stats = loadStats()
+stats.manual = Object.keys(manual.days).length > 0
+if (stats.manual) {
+  for (const [d, c] of Object.entries(manual.days)) {
+    if (!(d in stats.days)) stats.days[d] = Number(c) || 0
+  }
+  const sum = Object.values(manual.days).reduce((a, b) => a + (Number(b) || 0), 0)
+  if (sum !== stats.seed) console.warn(`手工按日合计 ${sum} 次，与回填 ${stats.seed} 次不一致，请核对`)
+  stats.seed = 0
+  stats.seedUntil = null
+}
 let flushTimer = null
 
 function saveStats() {
@@ -122,6 +161,17 @@ function statsPayload() {
       cursor.setDate(cursor.getDate() + 1)
     }
   }
+  // 累计曲线：回填日作为起点，之后每天把当日次数加进累计值
+  const cumulative = []
+  if (stats.seedUntil && stats.seed) {
+    cumulative.push({ date: stats.seedUntil, value: stats.seed, daily: null })
+  }
+  let running = stats.seed || 0
+  for (const d of days) {
+    running += d.count
+    cumulative.push({ date: d.date, value: running, daily: d.count })
+  }
+
   return {
     total: stats.total,
     today: stats.days[today] || 0,
@@ -129,8 +179,11 @@ function statsPayload() {
     first: stats.first,
     last: stats.last,
     baseline: stats.baseline,
+    manual: Boolean(stats.manual),
+    manualNote: manual.note,
     since,
     days,
+    cumulative,
   }
 }
 
